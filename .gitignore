@@ -1,0 +1,16 @@
+# Zależności we wszystkich podfolderach
+node_modules/
+.pnpm-store/
+
+# Zbudowane pliki produkcyjne
+dist/
+build/
+
+# Zmienne środowiskowe i sekrety
+.env
+.env.*
+
+# Logi i pliki systemowe/edytora
+*.log
+.DS_Store
+.vscode/

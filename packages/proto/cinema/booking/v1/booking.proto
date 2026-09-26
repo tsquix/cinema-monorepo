@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package cinema.booking.v1;
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+message LockSeatRequest
+{
+  string seat_id = 1;
+  string showing_id = 2;
+}
+
+message LockSeatResponse
+{
+  string                    reservation_token    = 1;
+  google.protobuf.Timestamp lock_expiration_time = 2;
+}
+
+service BookingService {
+  rpc GetSeatMap(GetSeatMapRequest) returns (GetSeatMapResponse);
+  rpc LockSeat(LockSeatRequest) returns (LockSeatResponse);
+  rpc ReleaseSeat(ReleaseSeatRequest) returns (google.protobuf.Empty);
+  rpc WatchSeatUpdates(GetSeatMapRequest) returns (stream SeatUpdate);
+}
+
+message ReleaseSeatRequest {
+  string seat_id           = 1;
+  string showing_id        = 2;
+  string reservation_token = 3;
+}
+
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+  FREE               = 1;
+  RESERVED           = 2;
+  BOUGHT             = 3;
+}
+
+message Seat {
+  string seat_id = 1;
+  Status status  = 2;
+}
+
+message GetSeatMapResponse {
+  repeated Seat seats = 1;
+  int32         rows  = 2;
+  int32         cols  = 3;
+}
+
+message GetSeatMapRequest {
+  string showing_id = 1;
+}
+
+message SeatUpdate {
+  string seat_id = 1;
+  Status status  = 2;
+}

@@ -1,0 +1,1 @@
+export * from "./src/gen/cinema/booking/v1/booking_pb.js";
