@@ -11,7 +11,10 @@ const statusMap: Record<string, Status> = {
 
 export async function getSeatsByShowing(showingId: string) {
   const result = await pool.query(
-    `SELECT seat_id, status FROM seat_reservations WHERE showing_id =$1`,
+    `SELECT seat_id, status 
+     FROM seat_reservations 
+     WHERE showing_id = $1
+     ORDER BY LEFT(seat_id, 1), CAST(SUBSTRING(seat_id FROM 2) AS INT)`,
     [showingId],
   );
   return result.rows.map((row) => ({
@@ -21,8 +24,12 @@ export async function getSeatsByShowing(showingId: string) {
 }
 
 export async function lockSeat(showingId: string, seatId: string) {
-  const selectResult = await pool.query(
-    `SELECT status, version, locked_until 
+  const selectResult = await pool.query<{
+    status: string;
+    version: number;
+    is_lock_active: boolean;
+  }>(
+    `SELECT status, version, (status = 'RESERVED' AND locked_until > NOW()) AS is_lock_active
      FROM seat_reservations 
      WHERE showing_id = $1 AND seat_id = $2`,
     [showingId, seatId],
@@ -33,13 +40,8 @@ export async function lockSeat(showingId: string, seatId: string) {
   }
 
   const seat = selectResult.rows[0];
-  const now = new Date();
 
-  const isLockActive =
-    seat.status === "RESERVED" &&
-    seat.locked_until &&
-    new Date(seat.locked_until) > now;
-  if (seat.status === "BOUGHT" || isLockActive) {
+  if (seat.status === "BOUGHT" || seat.is_lock_active) {
     throw new ConnectError(
       `Miejsce ${seatId} jest już zajęte!`,
       Code.AlreadyExists,
@@ -47,13 +49,16 @@ export async function lockSeat(showingId: string, seatId: string) {
   }
 
   const reservationToken = crypto.randomUUID();
-  const expirationTime = new Date(now.getTime() + 5 * 60 * 1000);
 
-  const updateResult = await pool.query(
+  const updateResult = await pool.query<{ locked_until: Date }>(
     `UPDATE seat_reservations 
-     SET status = 'RESERVED', reservation_token = $1, locked_until = $2, version = version + 1 
-     WHERE showing_id = $3 AND seat_id = $4 AND version = $5`,
-    [reservationToken, expirationTime, showingId, seatId, seat.version],
+     SET status = 'RESERVED', 
+         reservation_token = $1, 
+         locked_until = NOW() + INTERVAL '15 seconds', 
+         version = version + 1 
+     WHERE showing_id = $2 AND seat_id = $3 AND version = $4
+     RETURNING locked_until`,
+    [reservationToken, showingId, seatId, seat.version],
   );
 
   if (updateResult.rowCount === 0) {
@@ -62,11 +67,15 @@ export async function lockSeat(showingId: string, seatId: string) {
       Code.Aborted,
     );
   }
+
+  const expirationTime = updateResult.rows[0].locked_until;
+
   seatEvents.emit("seatChanged", {
     showingId,
     seatId,
     status: Status.RESERVED,
   });
+
   return {
     reservationToken,
     expirationTime,

@@ -1,6 +1,7 @@
 import http from "node:http";
 import { connectNodeAdapter } from "@connectrpc/connect-node";
 import { routes } from "./routes.js";
+import { cleanStaleSeatReservations } from "./services/cleanStaleSeatReservations.js";
 
 const handler = connectNodeAdapter({ routes });
 
@@ -23,5 +24,18 @@ const server = http.createServer((req, res) => {
 
 const PORT = 3000;
 server.listen(PORT, () => {
+  const stopCleanup = cleanStaleSeatReservations();
+  const shutdown = () => {
+    console.log("Zatrzymuję serwer...");
+    stopCleanup();
+    server.closeAllConnections();
+
+    server.close(() => {
+      console.log("Serwer zatrzymany.");
+      process.exit(0);
+    });
+  };
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
   console.log(`Serwer gRPC (Connect) nasłuchuje na porcie ${PORT}`);
 });
