@@ -1,44 +1,43 @@
-import { Status, type Seat } from "@cinema/proto";
+import { memo } from "react";
+import { Status } from "@cinema/proto";
+import { cn } from "../lib/cn";
+import { getSeatState, seatButtonVariants } from "./seat-button.variants";
 
 interface SeatButtonProps {
-  seat: Seat;
-  isMine: boolean;
+  seatId: string;
+  status: Status;
+  isSelected: boolean;
   disabled: boolean;
-  onClick: (seat: Seat) => void;
+  onSelect: (seatId: string) => void;
 }
 
-const getSeatColor = (status: Status, isMine: boolean) => {
-  if (status === Status.BOUGHT) return "#ef4444";
-  if (status === Status.RESERVED) return isMine ? "#3b82f6" : "#f59e0b";
-  return "#22c55e";
+const STATE_LABELS: Record<ReturnType<typeof getSeatState>, string> = {
+  available: "wolne",
+  selected: "Twoja rezerwacja",
+  locked: "zajęte przez kogoś",
+  sold: "kupione",
 };
 
-export function SeatButton({
-  seat,
-  isMine,
+export const SeatButton = memo(function SeatButton({
+  seatId,
+  status,
+  isSelected,
   disabled,
-  onClick,
+  onSelect,
 }: SeatButtonProps) {
-  const isBought = seat.status === Status.BOUGHT;
+  const state = getSeatState(status, isSelected);
+  const isSold = status === Status.BOUGHT;
 
   return (
     <button
-      onClick={() => onClick(seat)}
-      disabled={isBought || disabled}
-      style={{
-        width: "80px",
-        height: "80px",
-        fontSize: "20px",
-        fontWeight: "bold",
-        color: "white",
-        backgroundColor: getSeatColor(seat.status, isMine),
-        border: "none",
-        borderRadius: "12px",
-        cursor: isBought ? "not-allowed" : "pointer",
-        opacity: disabled ? 0.7 : 1,
-      }}
+      type="button"
+      onClick={() => onSelect(seatId)}
+      disabled={isSold || disabled}
+      aria-pressed={isSelected}
+      aria-label={`Miejsce ${seatId}, ${STATE_LABELS[state]}`}
+      className={cn(seatButtonVariants({ state, pending: disabled }))}
     >
-      {seat.seatId}
+      {seatId}
     </button>
   );
-}
+});
